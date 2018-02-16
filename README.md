@@ -18,7 +18,7 @@ git clone https://github.com/Caripson/Linux-disk-optimization.git;
 # run script
 
 chmod +x /tmp/Linux-disk-optimization/runme.sh;
-./runme.sh;
+/tmp/Linux-disk-optimization/runme.sh;
 
 # reboot
 
