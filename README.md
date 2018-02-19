@@ -1,3 +1,5 @@
+![Screenshot](img/Linux-disk-optimization.png )
+
 # Linux-disk-optimization
 Script for disk optimization
 
