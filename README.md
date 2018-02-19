@@ -27,8 +27,6 @@ chmod +x /tmp/Linux-disk-optimization/runme.sh;
 ```
 
 ![Screenshot](img/Linux-disk-optimization-after-before-1.png )
-![Screenshot](img/Linux-disk-optimization-after-before-2.png)
-
 
 ```
 Record size = 8 kBytes
