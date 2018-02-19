@@ -1,5 +1,6 @@
 #!/bin/sh
 
+
 ### BEGIN INIT INFO
 # Provides:          scriptname
 # Required-Start:    $remote_fs $syslog
