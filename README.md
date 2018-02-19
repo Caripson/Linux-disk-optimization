@@ -1,7 +1,7 @@
 ![Screenshot](img/Linux-disk-optimization.png )
 
 # Linux-disk-optimization
-Script for disk optimization for linux
+Script for disk optimization
 
 #### Setup
 
