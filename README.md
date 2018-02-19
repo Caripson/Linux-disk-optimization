@@ -22,8 +22,18 @@ git clone https://github.com/Caripson/Linux-disk-optimization.git;
 chmod +x /tmp/Linux-disk-optimization/runme.sh;
 /tmp/Linux-disk-optimization/runme.sh;
 
-# reboot
 
-reboot;
+
+```
+
+![Screenshot](img/Linux-disk-optimization-after-before-1 )
+![Screenshot](img/Linux-disk-optimization-after-before-2 )
+
+
+```
+Record size = 8 kBytes
+Output is in kBytes/sec
+
+iozone -R -b /root/bench_u02_test.xls -r 8k -s 100m -l 2 -u 10
 
 ```
