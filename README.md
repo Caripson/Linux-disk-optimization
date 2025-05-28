@@ -1,151 +1,203 @@
 # Linux Disk Optimization 2.0
 
-Automatiserat, säkert och flexibelt skript för att optimera disk-, minnes- och nätverksparametrar på Linux-servrar. Innehåller backup/restaurering, loggning, prestandatest och olika optimeringsnivåer.
+Automated, safe, and flexible script to optimize disk, memory, and network parameters on Linux servers. Features backup/restore, logging, performance testing, and multiple optimization levels.
 
 ---
 
-## ⚠️ Viktig Varning
-
-> **Det här skriptet ändrar kritiska systemfiler och systeminställningar!**
+> ## Do you really need this? Does it make a difference?
 >
-> - Kör **aldrig** på produktion utan backup!
-> - Skriptet skriver över `/etc/sysctl.conf` (backup skapas automatiskt).
-> - Körs som root och påverkar diskparametrar, kernel och nätverksinställningar.
-> - Ej avsett för vanliga desktop-datorer eller icke-experter.
+> **Short answer:**  
+> On most modern Linux systems, default parameters prioritize stability and compatibility—not peak performance for demanding workloads.  
+> **You may see real improvements if:**
+> - You run database, storage, file or streaming servers with many users or high I/O.
+> - You operate servers with a lot of RAM and modern SSD or NVMe disks.
+> - You want to maximize throughput or connection handling for specific applications.
+>
+> **What can change?**
+> - Up to 20–50% higher disk throughput on some workloads (e.g. large file transfers, parallel IO).
+> - Drastic improvement in handling thousands of simultaneous network connections.
+> - More efficient use of available RAM for shared memory and disk caching.
+>
+> **When is this not needed?**
+> - For laptops, desktops or small VMs running standard office/web apps, the benefit is usually minor.
+> - On many cloud/VPS platforms, kernel or disk settings may be locked or have minimal effect.
+>
+> **Summary:**  
+> These optimizations are mainly for system administrators and power users running high-demand Linux servers.
 
 ---
 
-## Innehåll
+## Technical background
 
-- [Syfte](#syfte)
-- [Vad skriptet gör](#vad-skriptet-gör)
-- [Funktioner](#funktioner)
-- [Krav & systemsupport](#krav--systemsuppport)
-- [Installation & användning](#installation--användning)
-- [Flaggor och nivåer](#flaggor-och-nivåer)
-- [Exempel](#exempel)
-- [Restore och backup](#restore-och-backup)
-- [Output och loggning](#output-och-loggning)
-- [Edge cases & tips](#edge-cases--tips)
-- [Resultat & Prestanda](#resultat--prestanda)
-- [Licens](#licens)
+### Why aren't Linux defaults "optimal" for all workloads?
 
----
+- **Conservatism:** Linux distributions set kernel, VM, and disk parameters to values that avoid edge-case crashes and work on almost all hardware—from old spinning disks to the latest NVMe.
+- **Safety for all:** Default sysctl.conf, disk scheduler, and network buffer settings prevent issues on minimal RAM, virtualized, or embedded systems.
+- **Diversity:** Not all workloads are equal—a database server and a desktop need radically different settings.
 
-## Syfte
+### What do these kernel and disk settings actually do?
 
-Detta skript syftar till att maximera I/O-prestanda och optimera kärn-, disk- och nätverksparametrar för Linux-servrar med mycket RAM och snabba diskar (t.ex. för databasanvändning eller storage-intensiva miljöer).
+- **Disk scheduler** (e.g., `noop`, `deadline`, `cfq`): Determines how Linux orders and prioritizes read/write requests to disks. For SSD/NVMe, simpler schedulers (like `noop`) are often much faster than legacy (rotating-disk-friendly) algorithms.
+- **Read-ahead (`read_ahead_kb`)**: Sets how much data Linux reads in advance per I/O request, which can boost performance for large sequential reads.
+- **Queue depth (`nr_requests`)**: Allows more outstanding IO operations in parallel; useful for high-throughput disks.
+- **Memory management** (`vm.dirty_ratio`, `vm.swappiness`, etc): Dictates when and how data is written from RAM to disk, and how much RAM is used for caching.
+- **Shared memory/semaphores:** Critical for database performance; default values are often too low for modern hardware.
+- **Network stack tuning:** Adjusts TCP buffer sizes and queue lengths for servers handling thousands of simultaneous connections.
 
----
+### Real-world impact
 
-## Vad skriptet gör
+- **Databases (PostgreSQL, MySQL, Oracle):**  
+  Properly tuned shared memory, disk scheduler, and dirty page settings can increase transaction throughput, reduce latency, and prevent bottlenecks under heavy load.
+- **File and storage servers:**  
+  Higher queue depths and more aggressive read-ahead allow higher sustained transfer rates, especially over fast networks and storage backends.
+- **Web servers / Proxies:**  
+  Tuning TCP stacks and connection queues improves resilience against connection floods and high concurrent loads.
 
-- **Backup av systemfiler** innan ändring
-- **Dynamisk optimering** av kernelparametrar utifrån RAM
-- **Disk scheduler- och read-ahead-tuning** på alla `/dev/sd*`-diskar (utom på VM)
-- **Nätverks- och file-systemtuning** för höga samtidiga anslutningar
-- **Stöd för flera optimeringsnivåer** (safe, aggressive, custom)
-- **Restore**: enkel återställning till senaste backup
-- **Loggning** till `/var/log/linux-disk-optimization.log`
-- **Prestandatest** före/efter med iozone om installerat
-- **Dry-run**: visa vad som hade gjorts utan att ändra något
+### Is this still relevant in 2024+?
+
+Yes!  
+- Linux continues to use safe defaults to avoid support headaches across millions of device types.  
+- Data centers, performance-focused SaaS, cloud workloads, and high-end VMs benefit from manual fine-tuning, especially as hardware (NVMe, huge RAM) outpaces default kernel values.
+- Automation matters: This script combines best-practice parameters and automatic hardware detection, making it easy to apply (and revert) advanced tuning safely.
 
 ---
 
-## Funktioner
-
-- **Automatisk backup & restore** av `/etc/sysctl.conf`
-- **Optimeringsnivåer:** safe, aggressive, custom
-- **Loggning av alla förändringar**
-- **Prestandatest** (med `iozone` om tillgängligt)
-- **Detekterar virtuella maskiner** och hoppar över riskabla optimeringar
-- **Dry-run**-läge för säker testning
-- **Säkerhetscheckar** (körs som root, beroenden, etc)
+**Bottom line:**  
+If your Linux server is doing "serious" work (data, network, high concurrency), **manual optimization is often still necessary**—and this script makes it safe, repeatable, and reversible.
 
 ---
 
-## Krav & systemsuppport
+## Contents
 
-### **Stöds**
-- **Debian/Ubuntu** (testat på kernel 4.x/5.x)
-- Fysiska Linux-servrar eller kraftfulla VM:ar där disk-parametrar kan ändras
-- Körs som root
+- [Purpose](#purpose)
+- [What the script does](#what-the-script-does)
+- [Features](#features)
+- [Requirements & Supported Systems](#requirements--supported-systems)
+- [Installation & Usage](#installation--usage)
+- [Flags & Levels](#flags--levels)
+- [Examples](#examples)
+- [Restore & Backup](#restore--backup)
+- [Output & Logging](#output--logging)
+- [Edge Cases & Tips](#edge-cases--tips)
+- [Results & Performance](#results--performance)
+- [License](#license)
 
-### **Stöds ej / Ej testat**
-- RedHat/CentOS/Fedora (viss manuell anpassning kan behövas)
+---
+
+## Purpose
+
+This script aims to maximize I/O performance and optimize kernel, disk, and network parameters for Linux servers with large amounts of RAM and fast disks (e.g., for databases or storage-intensive workloads).
+
+---
+
+## What the script does
+
+- **Backs up system files** before any changes
+- **Dynamically optimizes** kernel parameters based on system RAM
+- **Tunes disk scheduler and read-ahead** on all `/dev/sd*` disks (skips risky tweaks on VMs)
+- **Tunes network and file system parameters** for high concurrency
+- **Supports multiple optimization levels** (safe, aggressive, custom)
+- **Restore**: easy rollback to the last backup
+- **Logs** all actions to `/var/log/linux-disk-optimization.log`
+- **Runs performance tests** before/after (with `iozone` if installed)
+- **Dry-run** mode: see what would be done, without changing anything
+
+---
+
+## Features
+
+- **Automatic backup & restore** of `/etc/sysctl.conf`
+- **Optimization levels:** safe, aggressive, custom
+- **Full change logging**
+- **Performance tests** (with `iozone` if available)
+- **Detects virtual machines** and skips risky optimizations
+- **Dry-run** mode for safe simulation
+- **Safety checks** (root, dependencies, etc)
+
+---
+
+## Requirements & Supported Systems
+
+### **Supported**
+- **Debian/Ubuntu** (tested on kernel 4.x/5.x)
+- Physical Linux servers or powerful VMs where disk parameters can be changed
+- Must be run as root
+
+### **Not supported / Not tested**
+- RedHat/CentOS/Fedora (may require manual tweaks)
 - macOS, BSD, WSL
-- Virtuella servrar där blockdev/IO-parametrar är låsta (t.ex. vissa molnleverantörer)
-- Desktop-system (kan påverka användbarhet och stabilitet!)
+- Virtual/cloud servers where blockdev/IO parameters are locked (some cloud providers)
+- Desktop systems (may affect usability and stability!)
 
 ---
 
-## Installation & användning
+## Installation & Usage
 
-1. **Kloning av repo:**
+1. **Clone the repo:**
    ```sh
    git clone https://github.com/Caripson/Linux-disk-optimization.git
    cd Linux-disk-optimization
    ```
 
-2. **Gör scriptet körbart:**
+2. **Make the script executable:**
    ```sh
    chmod +x runme.sh
    ```
 
-3. **Kör scriptet (som root):**
+3. **Run the script (as root):**
    ```sh
    sudo ./runme.sh --level=aggressive
    ```
 
-   Eller kör en torrkörning:
+   Or do a dry run:
    ```sh
    sudo ./runme.sh --dry-run
    ```
 
 ---
 
-## Flaggor och nivåer
+## Flags & Levels
 
-| Flagga         | Funktion                                                            |
-|----------------|---------------------------------------------------------------------|
-| `--level=safe`       | Konservativ, säker optimering (default)                        |
-| `--level=aggressive` | Maximal prestanda (använd på eget ansvar)                      |
-| `--level=custom`     | Manuell justering (kräver att du själv redigerar i scriptet)   |
-| `--dry-run`          | Endast visa vad som skulle ske, ändrar inget                   |
-| `--restore`          | Återställer senaste backup av `/etc/sysctl.conf`               |
-| `--help`             | Visar hjälp och exempel                                        |
+| Flag                | Function                                                             |
+|---------------------|----------------------------------------------------------------------|
+| `--level=safe`      | Conservative, safe optimization (default)                            |
+| `--level=aggressive`| Maximal performance (use at your own risk)                           |
+| `--level=custom`    | Manual tuning (requires editing values in the script directly)        |
+| `--dry-run`         | Only shows what would be changed, makes no changes                   |
+| `--restore`         | Restores the latest backup of `/etc/sysctl.conf`                     |
+| `--help`            | Show help and usage examples                                         |
 
 ---
 
-## Exempel
+## Examples
 
-**Säker optimering:**
+**Safe optimization:**
 ```sh
 sudo ./runme.sh --level=safe
 ```
 
-**Aggressiv optimering (max prestanda):**
+**Aggressive optimization (max performance):**
 ```sh
 sudo ./runme.sh --level=aggressive
 ```
 
-**Visa alla ändringar utan att skriva något:**
+**Show all planned changes without writing anything:**
 ```sh
 sudo ./runme.sh --dry-run
 ```
 
-**Återställ till senaste backup:**
+**Restore to the latest backup:**
 ```sh
 sudo ./runme.sh --restore
 ```
 
 ---
 
-## Restore och backup
+## Restore & Backup
 
-- Backup av `/etc/sysctl.conf` sparas med timestamp i samma katalog.
-- Vid återställning (`--restore`) ersätts aktuell sysctl.conf med senaste backupen.
-- **Manuell återställning:**  
+- Backups of `/etc/sysctl.conf` are saved with a timestamp in the same directory.
+- When using `--restore`, the script replaces your current sysctl.conf with the latest backup.
+- **Manual restore:**  
   ```sh
   sudo cp /etc/sysctl.conf.bak.YYYY-MM-DD-HHMMSS /etc/sysctl.conf
   sudo sysctl -p
@@ -153,43 +205,47 @@ sudo ./runme.sh --restore
 
 ---
 
-## Output och loggning
+## Output & Logging
 
-- Alla händelser loggas till `/var/log/linux-disk-optimization.log`.
-- Loggfilen innehåller även fel och warnings.
-- Prestandatest (`iozone`) sparas till `/tmp/iozone_test_*.log`.
-
----
-
-## Edge cases & tips
-
-- **Virtuell maskin:** Scriptet känner av VM-miljö och hoppar över disk-parametrar (kan tvingas på manuellt om du vet vad du gör).
-- **Molnplattformar:** Kontrollera att du har rättigheter för att ändra blockdev/sysctl.
-- **IOzone** måste installeras manuellt för prestandatest (`sudo apt-get install iozone3`).
-- **Anpassa sysctl:** Vid "custom"-läge kan du själv redigera parametervärden i scriptet innan körning.
-- **Flera körningar:** Rekommenderas att alltid ta backup innan om du gör flera justeringar.
+- All actions are logged to `/var/log/linux-disk-optimization.log`.
+- Log includes errors and warnings.
+- Performance test results (`iozone`) are saved to `/tmp/iozone_test_*.log`.
 
 ---
 
-## Resultat & Prestanda
+## Edge Cases & Tips
 
-- Prestandatester (`iozone`) körs före och efter optimering och sparas i `/tmp`.
-- **Exempel på förväntad förbättring:**
-  - Högre I/O throughput vid stora filöverföringar
-  - Fler samtidiga anslutningar, snabbare socket-prestanda
-
----
-
-## Licens
-
-MIT License. Se [LICENSE](LICENSE) för mer info.
+- **Virtual machine:** The script detects VMs and skips disk parameter tuning (can be forced manually).
+- **Cloud platforms:** Ensure you have permission to change blockdev/sysctl parameters.
+- **IOzone** must be installed manually for benchmarking (`sudo apt-get install iozone3`).
+- **Custom sysctl:** In "custom" mode, edit parameter values in the script before running.
+- **Multiple runs:** Always make a backup if you are making repeated changes.
 
 ---
 
-## Kontakt / Issues
+## Results & Performance
 
-[Öppna en issue på GitHub](https://github.com/Caripson/Linux-disk-optimization/issues) vid problem, buggar eller förslag!
+- Performance tests (`iozone`) run before and after optimization and are saved in `/tmp`.
+- **Typical improvements may include:**
+  - Higher I/O throughput on large file transfers
+  - More concurrent connections, improved socket/network performance
 
 ---
 
+## License
 
+MIT License. See [LICENSE](LICENSE) for details.
+
+---
+
+## Contact / Issues
+
+[Open a GitHub issue](https://github.com/Caripson/Linux-disk-optimization/issues) for problems, bugs, or suggestions!
+
+---
+
+### Screenshot
+
+![Linux Disk Optimization Dashboard](img/Linux-disk-optimization.png)
+
+---
