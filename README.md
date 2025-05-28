@@ -4,6 +4,8 @@
 
 **Automated, safe, and flexible script to optimize disk, memory, and network parameters on Linux servers. Features backup/restore, logging, performance testing, and multiple optimization levels.**
 
+![Linux Disk Optimization 2.0](cover.png)
+
 ---
 
 > **⚠️ WARNING: THIS SCRIPT CHANGES CRITICAL SYSTEM FILES AND PARAMETERS!**
