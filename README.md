@@ -244,8 +244,3 @@ MIT License. See [LICENSE](LICENSE) for details.
 
 ---
 
-### Screenshot
-
-![Linux Disk Optimization Dashboard](img/Linux-disk-optimization.png)
-
----
